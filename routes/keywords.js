@@ -21,10 +21,9 @@ router.post('/extract', async (req, res) => {
 
     const result = await extractKeywords(cleaned, mode);
 
-    // Save to database
     if (result.keywords && result.keywords.length > 0) {
-      result.keywords.forEach(k => {
-        db.insertKeyword(
+      for (const k of result.keywords) {
+        await db.insertKeyword(
           k.keyword,
           k.category || 'core',
           k.intent_tag || 'informational',
@@ -32,7 +31,7 @@ router.post('/extract', async (req, res) => {
           k.score || 0.8,
           JSON.stringify(cleaned)
         );
-      });
+      }
     }
 
     res.json({
@@ -48,10 +47,10 @@ router.post('/extract', async (req, res) => {
 });
 
 // GET /api/keywords
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { category } = req.query;
-    const items = db.getAllKeywords();
+    const items = await db.getAllKeywords();
     const filtered = category ? items.filter(k => k.category === category) : items;
     res.json({ keywords: filtered });
   } catch (err) {
@@ -60,19 +59,15 @@ router.get('/', (req, res) => {
 });
 
 // DELETE /api/keywords/:id
-router.delete('/:id', (req, res) => {
-  try {
-    // Not implemented in simple API - delete all is used instead
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+router.delete('/:id', async (req, res) => {
+  // Not implemented — uses bulk delete instead
+  res.json({ success: true });
 });
 
 // DELETE /api/keywords — clear all
-router.delete('/', (req, res) => {
+router.delete('/', async (req, res) => {
   try {
-    db.deleteAllKeywords();
+    await db.deleteAllKeywords();
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -5,6 +5,21 @@ const express = require('express');
 const path = require('path');
 const db = require('./database');
 
+// Lazy init — auto-creates tables on first request if not done at startup
+let _dbReady = false;
+async function ensureDb() {
+  if (!_dbReady) {
+    await db.initDatabase();
+    _dbReady = true;
+  }
+}
+
+// Middleware: ensure DB ready before every API call
+const apiMiddleware = async (req, res, next) => {
+  await ensureDb();
+  next();
+};
+
 // Import routes
 const keywordsRouter = require('./routes/keywords');
 const articlesRouter = require('./routes/articles');
@@ -31,10 +46,10 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── API Routes ───────────────────────────────────────────────────────────────
-app.use('/api/keywords',   keywordsRouter);
-app.use('/api/articles',   articlesRouter);
-app.use('/api/platforms',  platformsRouter);
-app.use('/api/settings',   settingsRouter);
+app.use('/api/keywords',   apiMiddleware, keywordsRouter);
+app.use('/api/articles',   apiMiddleware, articlesRouter);
+app.use('/api/platforms',  apiMiddleware, platformsRouter);
+app.use('/api/settings',   apiMiddleware, settingsRouter);
 
 // ─── SPA Fallback ─────────────────────────────────────────────────────────────
 app.get('*', (req, res) => {
@@ -49,7 +64,8 @@ app.use((err, req, res, next) => {
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 async function start() {
-  await db.initDatabase();
+  // 本地开发时初始化数据库（Vercel 环境用 apiMiddleware 自动初始化）
+  if (!process.env.VERCEL) await ensureDb();
 
   app.listen(PORT, () => {
     console.log(`

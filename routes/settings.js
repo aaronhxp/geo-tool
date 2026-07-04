@@ -5,16 +5,15 @@ const router = express.Router();
 const db = require('../database');
 
 // GET /api/settings
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const settings = db.getAllSettings();
-    // Mask sensitive fields
+    const settings = await db.getAllSettings();
     if (settings.openai_api_key) {
       const key = settings.openai_api_key;
       settings.openai_api_key_masked = key.substring(0, 6) + '***' + key.substring(key.length - 4);
       settings.openai_api_key_set = true;
     }
-    delete settings.openai_api_key; // Never send raw key
+    delete settings.openai_api_key;
     res.json({ settings });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -22,11 +21,11 @@ router.get('/', (req, res) => {
 });
 
 // POST /api/settings
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { key, value } = req.body;
     if (!key) return res.status(400).json({ error: '缺少 key 参数' });
-    db.setSetting(key, value);
+    await db.setSetting(key, value);
     res.json({ success: true, key });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -34,12 +33,11 @@ router.post('/', (req, res) => {
 });
 
 // GET /api/settings/export
-router.get('/export', (req, res) => {
+router.get('/export', async (req, res) => {
   try {
-    const settings = db.getAllSettings();
+    const settings = await db.getAllSettings();
     res.setHeader('Content-Disposition', 'attachment; filename=geo-settings.json');
     res.setHeader('Content-Type', 'application/json');
-    // Mask API keys in export
     const exportData = { ...settings };
     if (exportData.openai_api_key) exportData.openai_api_key = '***MASKED***';
     res.json(exportData);

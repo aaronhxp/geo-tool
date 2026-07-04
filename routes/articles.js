@@ -6,7 +6,6 @@ const db = require('../database');
 const { generateArticle, improveArticle } = require('../services/llm');
 const { publishArticle } = require('../services/publisher');
 
-// 从 markdown 内容中提取第一张图片 URL
 function extractFirstImage(markdown) {
   if (!markdown) return null;
   const match = markdown.match(/!\[.*?\]\((.+?)\)/);
@@ -14,17 +13,17 @@ function extractFirstImage(markdown) {
 }
 
 // GET /api/articles
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { platform, status, search, limit, offset } = req.query;
-    const articles = db.getAllArticles({
+    const articles = await db.getAllArticles({
       platform,
       status,
       search,
       limit: +limit || 50,
       offset: +offset || 0
     });
-    const total = db.getArticleCount({ platform, status, search });
+    const total = await db.getArticleCount({ platform, status, search });
     res.json({ articles, total });
   } catch (err) {
     console.error('[articles GET]', err.message);
@@ -33,9 +32,9 @@ router.get('/', (req, res) => {
 });
 
 // GET /api/articles/:id
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
-    const article = db.getArticleById(+req.params.id);
+    const article = await db.getArticleById(+req.params.id);
     if (!article) return res.status(404).json({ error: '文章不存在' });
     res.json(article);
   } catch (err) {
@@ -54,11 +53,10 @@ router.post('/generate', async (req, res) => {
 
     const content = await generateArticle({ keywords, platform, tone, wordCount: +wordCount });
 
-    // Extract title from content (first # heading)
     const titleMatch = content.match(/^#\s+(.+)$/m);
     const title = titleMatch ? titleMatch[1] : `${keywords[0]}深度分析`;
 
-    const articleId = db.insertArticle({
+    const articleId = await db.insertArticle({
       title,
       content,
       platform,
@@ -67,7 +65,7 @@ router.post('/generate', async (req, res) => {
       cover_image: extractFirstImage(content)
     });
 
-    const article = db.getArticleById(articleId);
+    const article = await db.getArticleById(articleId);
     res.json({ article, content });
 
   } catch (err) {
@@ -91,12 +89,12 @@ router.post('/improve', async (req, res) => {
 });
 
 // POST /api/articles
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { title, content, platform, keywords, status } = req.body;
     if (!title || !content) return res.status(400).json({ error: '标题和内容不能为空' });
 
-    const articleId = db.insertArticle({
+    const articleId = await db.insertArticle({
       title,
       content,
       platform: platform || 'manual',
@@ -105,7 +103,7 @@ router.post('/', (req, res) => {
       cover_image: extractFirstImage(content)
     });
 
-    const article = db.getArticleById(articleId);
+    const article = await db.getArticleById(articleId);
     res.json({ article });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -113,12 +111,12 @@ router.post('/', (req, res) => {
 });
 
 // PUT /api/articles/:id
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
-    const existing = db.getArticleById(+req.params.id);
+    const existing = await db.getArticleById(+req.params.id);
     if (!existing) return res.status(404).json({ error: '文章不存在' });
 
-    db.updateArticle(+req.params.id, {
+    await db.updateArticle(+req.params.id, {
       title: req.body.title,
       content: req.body.content,
       platform: req.body.platform,
@@ -127,7 +125,7 @@ router.put('/:id', (req, res) => {
       cover_image: req.body.cover_image
     });
 
-    const updated = db.getArticleById(+req.params.id);
+    const updated = await db.getArticleById(+req.params.id);
     res.json({ article: updated });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -135,9 +133,9 @@ router.put('/:id', (req, res) => {
 });
 
 // DELETE /api/articles/:id
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
-    db.deleteArticle(+req.params.id);
+    await db.deleteArticle(+req.params.id);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -160,9 +158,9 @@ router.post('/:id/publish', async (req, res) => {
 });
 
 // GET /api/articles/published/history
-router.get('/published/history', (req, res) => {
+router.get('/published/history', async (req, res) => {
   try {
-    const history = db.getRecentPublishedHistory(+req.query.limit || 20);
+    const history = await db.getRecentPublishedHistory(+req.query.limit || 20);
     res.json({ history });
   } catch (err) {
     res.status(500).json({ error: err.message });
