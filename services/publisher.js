@@ -417,6 +417,176 @@ const publishers = {
     }
   },
 
+  // ── 百度百家号 ────────────────────────────────────────────────────────────
+  baijiahao: {
+    async publish(article, config) {
+      const { appId, appToken, coverUrl } = config;
+      
+      if (!appId || !appToken) {
+        throw new Error('百家号配置不完整，请填写 AppID 和 AppToken');
+      }
+
+      // 百家号内容需要 HTML 格式
+      const htmlContent = this._markdownToHtml(article.content);
+      
+      // 提取第一张图片作为封面
+      let coverImages = [];
+      if (coverUrl) {
+        coverImages.push(coverUrl);
+      } else {
+        const firstImg = this._extractFirstImage(article.content);
+        if (firstImg) coverImages.push(firstImg);
+      }
+
+      const payload = {
+        app_id: appId,
+        app_token: appToken,
+        title: article.title,
+        content: htmlContent,
+        cover_images: coverImages,
+        is_original: 1,
+        article_type: 'news'
+      };
+
+      try {
+        // 百家号 API 地址（实际使用时需要替换为正确的 API 端点）
+        const response = await axios.post(
+          'https://baijiahao.baidu.com/builderinner/open/resource/article/publish',
+          payload,
+          {
+            headers: { 'Content-Type': 'application/json' },
+            timeout: 20000
+          }
+        );
+        
+        if (response.data.errno === 0) {
+          return {
+            success: true,
+            url: `https://baijiahao.baidu.com/s?id=${response.data.data.article_id}`,
+            platformPostId: String(response.data.data.article_id),
+            message: '发布成功！文章已提交到百家号审核'
+          };
+        }
+        
+        // API 返回错误
+        throw new Error(`百家号发布失败：${response.data.errmsg || '未知错误'}`);
+        
+      } catch (e) {
+        // 百家号 API 限制较多，降级为手动发布提示
+        return {
+          success: false,
+          url: null,
+          message: `百家号 API 暂不可用（${e.response?.status || e.message}）。请手动复制文章内容到百家号后台发布。`,
+          manual: true,
+          manualUrl: 'https://baijiahao.baidu.com/builder/author/workbench/content/article'
+        };
+      }
+    },
+
+    _markdownToHtml(md) {
+      return md
+        .replace(/^#{1,6}\s+(.+)$/gm, (_, t) => `<h2>${t}</h2>`)
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" />')
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/^(.+)$/gm, (line) => line.startsWith('<') ? line : `<p>${line}</p>`);
+    },
+
+    _extractFirstImage(content) {
+      const match = content.match(/!\[.*?\]\((.*?)\)/);
+      return match ? match[1] : null;
+    },
+
+    async test(config) {
+      if (!config.appId || !config.appToken) {
+        return { success: false, message: '缺少 AppID 或 AppToken' };
+      }
+      // 百家号没有简单的测试接口，这里只做格式校验
+      return { success: true, message: '配置格式正确（百家号 API 限制，无法在线验证）' };
+    }
+  },
+
+  // ── 搜狐个人自媒体 ─────────────────────────────────────────────────────────
+  sohu: {
+    async publish(article, config) {
+      const { passport, password, coverUrl } = config;
+      
+      if (!passport || !password) {
+        throw new Error('搜狐配置不完整，请填写搜狐通行证账号和密码');
+      }
+
+      // 搜狐自媒体内容需要纯文本或简单 HTML
+      const plainContent = article.content
+        .replace(/#{1,6}\s/g, '')
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1')
+        .replace(/!\[.*?\]\((.*?)\)/g, '<img src="$1" />')
+        .replace(/\n+/g, '<br>');
+
+      // 提取封面图
+      let coverImage = coverUrl || this._extractFirstImage(article.content) || '';
+
+      const payload = {
+        title: article.title,
+        content: plainContent,
+        cover: coverImage,
+        category: '科技', // 默认分类，可配置
+        tags: Array.isArray(article.keywords) ? article.keywords : []
+      };
+
+      try {
+        // 搜狐自媒体 API（实际使用时需要替换为正确的 API 端点）
+        // 注意：搜狐没有公开的发布 API，这里使用模拟请求
+        const response = await axios.post(
+          'https://mp.sohu.com/api/v2/article/publish',
+          payload,
+          {
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Basic ${Buffer.from(`${passport}:${password}`).toString('base64')}`
+            },
+            timeout: 20000
+          }
+        );
+        
+        if (response.data.code === 200) {
+          return {
+            success: true,
+            url: response.data.data.url,
+            platformPostId: String(response.data.data.id),
+            message: '发布成功！'
+          };
+        }
+        
+        throw new Error(`搜狐发布失败：${response.data.message || '未知错误'}`);
+        
+      } catch (e) {
+        // 搜狐没有公开 API，降级为手动发布
+        return {
+          success: false,
+          url: null,
+          message: `搜狐自媒体暂不支持自动发布（${e.response?.status || e.message}）。请手动复制文章内容到搜狐后台发布。`,
+          manual: true,
+          manualUrl: 'https://mp.sohu.com/main/home/index.action'
+        };
+      }
+    },
+
+    _extractFirstImage(content) {
+      const match = content.match(/!\[.*?\]\((.*?)\)/);
+      return match ? match[1] : null;
+    },
+
+    async test(config) {
+      if (!config.passport || !config.password) {
+        return { success: false, message: '缺少搜狐通行证账号或密码' };
+      }
+      // 搜狐没有测试接口
+      return { success: true, message: '配置格式正确（搜狐 API 限制，无法在线验证）' };
+    }
+  },
+
   // ── Generic Webhook ─────────────────────────────────────────────────────────
   webhook: {
     async publish(article, config) {

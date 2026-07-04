@@ -809,6 +809,18 @@ function renderPlatformForm(type) {
     weibo: `
       <div class="form-group"><label class="form-label">平台名称</label><input type="text" id="pf-name" class="input" placeholder="我的微博" /></div>
       <div class="form-group"><label class="form-label">Access Token</label><input type="password" id="pf-accessToken" class="input" placeholder="从微博开放平台获取" /></div>`,
+    baijiahao: `
+      <div class="form-group"><label class="form-label">平台名称</label><input type="text" id="pf-name" class="input" placeholder="我的百家号" /></div>
+      <div class="form-group"><label class="form-label">AppID</label><input type="text" id="pf-appId" class="input" placeholder="百家号 AppID" /></div>
+      <div class="form-group"><label class="form-label">AppToken</label><input type="password" id="pf-appToken" class="input" placeholder="百家号 AppToken" /></div>
+      <div class="form-group"><label class="form-label">封面图 URL（可选）</label><input type="url" id="pf-coverUrl" class="input" placeholder="https://example.com/cover.jpg" /><p class="form-hint">不填则自动抓取文章第一张图片作为封面</p></div>
+      <div class="form-group"><p class="form-hint" style="color:var(--warning)">⚠️ 百家号 API 限制较多，如自动发布失败，请手动复制内容到百家号后台发布</p></div>`,
+    sohu: `
+      <div class="form-group"><label class="form-label">平台名称</label><input type="text" id="pf-name" class="input" placeholder="我的搜狐号" /></div>
+      <div class="form-group"><label class="form-label">搜狐通行证账号</label><input type="text" id="pf-passport" class="input" placeholder="邮箱或手机号" /></div>
+      <div class="form-group"><label class="form-label">密码</label><input type="password" id="pf-password" class="input" placeholder="登录密码" /></div>
+      <div class="form-group"><label class="form-label">封面图 URL（可选）</label><input type="url" id="pf-coverUrl" class="input" placeholder="https://example.com/cover.jpg" /><p class="form-hint">不填则自动抓取文章第一张图片作为封面</p></div>
+      <div class="form-group"><p class="form-hint" style="color:var(--warning)">⚠️ 搜狐自媒体暂不支持 API 自动发布，添加后请手动复制内容到搜狐后台发布</p></div>`,
     webhook: `
       <div class="form-group"><label class="form-label">平台名称</label><input type="text" id="pf-name" class="input" placeholder="我的 Webhook" /></div>
       <div class="form-group"><label class="form-label">Webhook URL</label><input type="url" id="pf-url" class="input" placeholder="https://your-server.com/webhook" /></div>
@@ -850,6 +862,16 @@ async function addPlatform() {
       break;
     case 'weibo':
       config.accessToken = document.getElementById('pf-accessToken')?.value;
+      break;
+    case 'baijiahao':
+      config.appId = document.getElementById('pf-appId')?.value;
+      config.appToken = document.getElementById('pf-appToken')?.value;
+      config.coverUrl = document.getElementById('pf-coverUrl')?.value?.trim();
+      break;
+    case 'sohu':
+      config.passport = document.getElementById('pf-passport')?.value;
+      config.password = document.getElementById('pf-password')?.value;
+      config.coverUrl = document.getElementById('pf-coverUrl')?.value?.trim();
       break;
     case 'webhook':
       config.url = document.getElementById('pf-url')?.value;
@@ -1348,6 +1370,8 @@ function getPlatformLabel(type) {
     zhihu: '知乎',
     wechat: '微信公众号',
     weibo: '微博',
+    baijiahao: '百度百家号',
+    sohu: '搜狐自媒体',
     webhook: '通用 Webhook'
   };
   return labels[type] || type;
@@ -1359,6 +1383,8 @@ function getPlatformEmoji(type) {
     zhihu: '💬',
     wechat: '📱',
     weibo: '📣',
+    baijiahao: '📰',
+    sohu: '📑',
     webhook: '⚡'
   };
   return emojis[type] || '🌐';
@@ -1370,6 +1396,8 @@ function getPlatformColor(type) {
     zhihu: '#0084ff',
     wechat: '#07c160',
     weibo: '#e6162d',
+    baijiahao: '#2932e1',
+    sohu: '#f39800',
     webhook: '#f0883e'
   };
   return colors[type] || '#8b949e';
