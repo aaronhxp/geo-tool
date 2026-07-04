@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GEO-Tool — AI 内容优化与发布平台</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23161b22'/><text x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' font-size='20' fill='%2358a6ff'>G</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- ── Navigation ────────────────────────────────────────────────────────── -->
+  <nav class="navbar">
+    <div class="nav-inner">
+      <div class="nav-brand">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <rect width="28" height="28" rx="7" fill="#58a6ff" fill-opacity="0.15"/>
+          <text x="50%" y="56%" dominant-baseline="middle" text-anchor="middle" font-size="15" font-weight="700" fill="#58a6ff" font-family="Inter">G</text>
+        </svg>
+        <span class="brand-name">GEO-Tool</span>
+        <span class="brand-tag">v1.0</span>
+      </div>
+      <div class="nav-tabs" role="tablist">
+        <button class="nav-tab active" data-tab="keywords" role="tab" aria-selected="true">
+          <i data-lucide="sparkles" class="tab-icon"></i>关键词提炼
+        </button>
+        <button class="nav-tab" data-tab="writing" role="tab" aria-selected="false">
+          <i data-lucide="pen-tool" class="tab-icon"></i>文章写作
+        </button>
+        <button class="nav-tab" data-tab="articles" role="tab" aria-selected="false">
+          <i data-lucide="library" class="tab-icon"></i>文章管理
+        </button>
+        <button class="nav-tab" data-tab="platforms" role="tab" aria-selected="false">
+          <i data-lucide="globe" class="tab-icon"></i>平台发布
+        </button>
+        <button class="nav-tab" data-tab="settings" role="tab" aria-selected="false">
+          <i data-lucide="settings" class="tab-icon"></i>设置
+        </button>
+      </div>
+      <div class="nav-status" id="apiStatus">
+        <span class="status-dot offline"></span>
+        <span class="status-text">未配置</span>
+      </div>
+      <div class="theme-toggle">
+        <button class="theme-btn active" id="themeDark" title="黑夜模式" onclick="setTheme('dark')">
+          <i data-lucide="moon" class="theme-icon"></i>
+        </button>
+        <button class="theme-btn" id="themeLight" title="白天模式" onclick="setTheme('light')">
+          <i data-lucide="sun" class="theme-icon"></i>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Main Content ──────────────────────────────────────────────────────── -->
+  <main class="main-content">
+
+    <!-- ── Tab: Keywords ─────────────────────────────────────────────────── -->
+    <section class="tab-panel active" id="tab-keywords" role="tabpanel">
+      <div class="panel-header">
+        <h2 class="panel-title">关键词提炼</h2>
+        <p class="panel-desc">输入核心主题，AI 将为你提炼 LLM 友好的语义关键词组，覆盖核心词、实体词、疑问词、场景词四个维度。</p>
+      </div>
+
+      <div class="keywords-layout">
+        <!-- Left: Input -->
+        <div class="card keyword-input-card">
+          <div class="card-header">
+            <h3><i data-lucide="input" class="card-icon"></i>输入种子关键词</h3>
+          </div>
+          <div class="card-body">
+            <textarea id="kwInput" class="textarea" placeholder="输入关键词，每行一个或用逗号分隔&#10;例如：&#10;人工智能&#10;大语言模型&#10;LLM应用场景&#10;&#10;支持粘贴网页URL，自动提取内容关键词" rows="6"></textarea>
+            <div class="input-actions">
+              <label class="btn btn-outline btn-sm file-label">
+                <i data-lucide="upload" class="btn-icon"></i>批量导入
+                <input type="file" id="kwFileImport" accept=".txt,.csv" style="display:none" />
+              </label>
+              <button class="btn btn-primary" id="extractBtn" onclick="extractKeywords()">
+                <i data-lucide="zap" class="btn-icon"></i>开始提炼
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Results -->
+        <div class="card keyword-result-card">
+          <div class="card-header">
+            <h3><i data-lucide="tags" class="card-icon"></i>提炼结果</h3>
+            <div class="card-actions">
+              <button class="btn btn-ghost btn-sm" onclick="copyKeywords()" title="复制为 Prompt">
+                <i data-lucide="copy" class="btn-icon"></i>复制
+              </button>
+              <button class="btn btn-ghost btn-sm" onclick="exportKeywords()" title="导出">
+                <i data-lucide="download" class="btn-icon"></i>导出
+              </button>
+              <button class="btn btn-ghost btn-sm" onclick="clearKeywords()" title="清空">
+                <i data-lucide="trash-2" class="btn-icon"></i>清空
+              </button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div id="kwLoading" class="loading-state hidden">
+              <div class="spinner"></div>
+              <span>AI 正在分析语义关联...</span>
+            </div>
+            <div id="kwEmpty" class="empty-state">
+              <i data-lucide="search" class="empty-icon"></i>
+              <p>提炼结果将在此显示</p>
+              <small>输入关键词后点击「开始提炼」</small>
+            </div>
+            <div id="kwResults" class="kw-results hidden">
+              <div class="kw-summary" id="kwSummary"></div>
+              <div class="kw-category-section" id="kwCore"></div>
+              <div class="kw-category-section" id="kwEntity"></div>
+              <div class="kw-category-section" id="kwQuestion"></div>
+              <div class="kw-category-section" id="kwScenario"></div>
+            </div>
+            <div class="kw-suggestions hidden" id="kwSuggestions"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LLM Prompt Preview -->
+      <div class="card prompt-preview-card">
+        <div class="card-header">
+          <h3><i data-lucide="bot" class="card-icon"></i>LLM 友好 Prompt 预览</h3>
+          <button class="btn btn-ghost btn-sm" onclick="copyPromptPreview()">
+            <i data-lucide="copy" class="btn-icon"></i>复制 Prompt
+          </button>
+        </div>
+        <div class="card-body">
+          <pre id="promptPreview" class="code-block"><span class="code-comment">// 选中关键词后，此处将生成优化的 Prompt 格式</span></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Tab: Writing ──────────────────────────────────────────────────── -->
+    <section class="tab-panel" id="tab-writing" role="tabpanel">
+      <div class="panel-header">
+        <h2 class="panel-title">文章写作</h2>
+        <p class="panel-desc">基于提炼的关键词，生成适配不同平台调性的高质量文章。</p>
+      </div>
+
+      <!-- Writing Controls -->
+      <div class="card writing-controls-card">
+        <div class="control-row">
+          <div class="control-group">
+            <label class="control-label">选择关键词</label>
+            <div class="keyword-selector" id="kwSelector">
+              <span class="kw-placeholder">请先在「关键词提炼」中选择关键词</span>
+            </div>
+          </div>
+        </div>
+        <div class="control-row">
+          <div class="control-group flex-1">
+            <label class="control-label">平台类型</label>
+            <div class="platform-radio-group">
+              <label class="radio-card" data-platform="news">
+                <input type="radio" name="writePlatform" value="news" checked />
+                <div class="radio-content">
+                  <i data-lucide="newspaper" class="radio-icon"></i>
+                  <span class="radio-title">新闻平台</span>
+                  <span class="radio-desc">严肃客观 · 数据驱动</span>
+                </div>
+              </label>
+              <label class="radio-card" data-platform="commercial">
+                <input type="radio" name="writePlatform" value="commercial" />
+                <div class="radio-content">
+                  <i data-lucide="bar-chart-2" class="radio-icon"></i>
+                  <span class="radio-title">商业分析</span>
+                  <span class="radio-desc">第三方视角 · 行业洞察</span>
+                </div>
+              </label>
+              <label class="radio-card" data-platform="social">
+                <input type="radio" name="writePlatform" value="social" />
+                <div class="radio-content">
+                  <i data-lucide="message-circle" class="radio-icon"></i>
+                  <span class="radio-title">自媒体</span>
+                  <span class="radio-desc">直击痛点 · 情感共鸣</span>
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="control-row">
+          <div class="control-group">
+            <label class="control-label">目标字数</label>
+            <select id="wordCount" class="select">
+              <option value="500">500 字（短内容）</option>
+              <option value="800" selected>800 字（标准）</option>
+              <option value="1200">1200 字（长文）</option>
+              <option value="2000">2000 字（深度）</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label class="control-label">语气风格</label>
+            <select id="writeTone" class="select">
+              <option value="neutral">中立客观</option>
+              <option value="enthusiastic">热情洋溢</option>
+              <option value="professional">专业严谨</option>
+              <option value="conversational">亲切随和</option>
+            </select>
+          </div>
+          <div class="control-group control-actions">
+            <button class="btn btn-primary btn-lg" onclick="generateArticle()" id="genBtn">
+              <i data-lucide="sparkles" class="btn-icon"></i>生成文章
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Editor + Preview -->
+      <div class="editor-layout">
+        <div class="card editor-card">
+          <div class="card-header">
+            <h3><i data-lucide="edit-3" class="card-icon"></i>文章编辑器</h3>
+            <div class="editor-meta" id="editorMeta">
+              <span id="wordCountDisplay">0 字</span>
+              <span>·</span>
+              <span id="readTimeDisplay">约 0 分钟</span>
+            </div>
+          </div>
+          <div class="card-body editor-body">
+            <textarea id="articleEditor" class="article-editor" placeholder="生成的文章将在此显示，或直接在此编辑..."></textarea>
+          </div>
+          <div class="editor-toolbar">
+            <div class="toolbar-left">
+              <button class="btn btn-ghost btn-sm" onclick="improveArticle()" title="AI 润色">
+                <i data-lucide="wand-2" class="btn-icon"></i>AI 润色
+              </button>
+              <button class="btn btn-ghost btn-sm" onclick="insertImage()" title="插入图片">
+                <i data-lucide="image-plus" class="btn-icon"></i>插入图片
+              </button>
+            </div>
+            <div class="toolbar-right">
+              <button class="btn btn-ghost btn-sm" onclick="copyArticle()" title="复制全文">
+                <i data-lucide="copy" class="btn-icon"></i>复制
+              </button>
+              <button class="btn btn-outline btn-sm" onclick="saveArticle()">
+                <i data-lucide="save" class="btn-icon"></i>保存
+              </button>
+              <button class="btn btn-primary btn-sm" onclick="openPublishModal()" id="publishBtn" disabled>
+                <i data-lucide="send" class="btn-icon"></i>发布
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="card preview-card">
+          <div class="card-header">
+            <h3><i data-lucide="eye" class="card-icon"></i>预览</h3>
+          </div>
+          <div class="card-body preview-body" id="articlePreview">
+            <div class="preview-placeholder">
+              <i data-lucide="file-text" class="empty-icon"></i>
+              <p>文章预览将显示在这里</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Tab: Articles ────────────────────────────────────────────────── -->
+    <section class="tab-panel" id="tab-articles" role="tabpanel">
+      <div class="panel-header">
+        <h2 class="panel-title">文章管理</h2>
+        <p class="panel-desc">所有已保存的文章，支持搜索、筛选、编辑和重新发布。</p>
+      </div>
+
+      <div class="card">
+        <div class="articles-toolbar">
+          <div class="search-box">
+            <i data-lucide="search" class="search-icon"></i>
+            <input type="text" id="articleSearch" class="search-input" placeholder="搜索文章标题或内容..." oninput="loadArticles()" />
+          </div>
+          <div class="filter-group">
+            <select id="filterPlatform" class="select select-sm" onchange="loadArticles()">
+              <option value="">全部平台</option>
+              <option value="news">新闻平台</option>
+              <option value="commercial">商业分析</option>
+              <option value="social">自媒体</option>
+              <option value="manual">手动编辑</option>
+            </select>
+            <select id="filterStatus" class="select select-sm" onchange="loadArticles()">
+              <option value="">全部状态</option>
+              <option value="draft">草稿</option>
+              <option value="published">已发布</option>
+              <option value="failed">发布失败</option>
+            </select>
+          </div>
+          <div class="articles-count" id="articlesCount">共 0 篇</div>
+        </div>
+        <div class="articles-list" id="articlesList">
+          <div class="empty-state">
+            <i data-lucide="file-text" class="empty-icon"></i>
+            <p>暂无文章</p>
+            <small>在「文章写作」中生成并保存文章</small>
+          </div>
+        </div>
+        <div class="pagination" id="articlesPagination"></div>
+      </div>
+    </section>
+
+    <!-- ── Tab: Platforms ───────────────────────────────────────────────── -->
+    <section class="tab-panel" id="tab-platforms" role="tabpanel">
+      <div class="panel-header">
+        <h2 class="panel-title">平台授权</h2>
+        <p class="panel-desc">配置各平台的发布账号，授权后可直接从 GEO-Tool 一键发布文章。</p>
+      </div>
+
+      <div class="platforms-layout">
+        <!-- Connected Platforms -->
+        <div class="card">
+          <div class="card-header">
+            <h3><i data-lucide="link" class="card-icon"></i>已授权平台</h3>
+          </div>
+          <div class="card-body">
+            <div class="platforms-grid" id="platformsGrid">
+              <div class="empty-state">
+                <i data-lucide="plug" class="empty-icon"></i>
+                <p>尚未添加任何平台</p>
+                <small>点击下方按钮添加发布平台</small>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Add New Platform -->
+        <div class="card">
+          <div class="card-header">
+            <h3><i data-lucide="plus-circle" class="card-icon"></i>添加新平台</h3>
+          </div>
+          <div class="card-body">
+            <div class="platform-type-selector">
+              <button class="platform-type-btn active" data-type="wordpress" onclick="selectPlatformType('wordpress')">
+                <i data-lucide="globe" class="pt-icon"></i>
+                <span>WordPress</span>
+              </button>
+              <button class="platform-type-btn" data-type="zhihu" onclick="selectPlatformType('zhihu')">
+                <i data-lucide="message-square" class="pt-icon"></i>
+                <span>知乎</span>
+              </button>
+              <button class="platform-type-btn" data-type="wechat" onclick="selectPlatformType('wechat')">
+                <i data-lucide="smartphone" class="pt-icon"></i>
+                <span>微信公众号</span>
+              </button>
+              <button class="platform-type-btn" data-type="weibo" onclick="selectPlatformType('weibo')">
+                <i data-lucide="at-sign" class="pt-icon"></i>
+                <span>微博</span>
+              </button>
+              <button class="platform-type-btn" data-type="webhook" onclick="selectPlatformType('webhook')">
+                <i data-lucide="webhook" class="pt-icon"></i>
+                <span>通用 Webhook</span>
+              </button>
+            </div>
+
+            <div class="platform-config-form" id="platformForm">
+              <!-- Dynamic form based on selected platform type -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Publish History -->
+        <div class="card">
+          <div class="card-header">
+            <h3><i data-lucide="history" class="card-icon"></i>发布记录</h3>
+          </div>
+          <div class="card-body">
+            <div class="publish-history" id="publishHistory">
+              <div class="empty-state">
+                <i data-lucide="clock" class="empty-icon"></i>
+                <p>暂无发布记录</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Tab: Settings ─────────────────────────────────────────────────── -->
+    <section class="tab-panel" id="tab-settings" role="tabpanel">
+      <div class="panel-header">
+        <h2 class="panel-title">设置</h2>
+        <p class="panel-desc">配置 AI API、默认偏好和数据管理。</p>
+      </div>
+
+      <div class="settings-layout">
+        <div class="card">
+          <div class="card-header">
+            <h3><i data-lucide="key-round" class="card-icon"></i>AI 大模型配置</h3>
+          </div>
+          <div class="card-body">
+
+            <!-- Provider Presets -->
+            <div class="setting-row">
+              <div class="setting-info">
+                <label class="setting-label">选择服务商</label>
+                <p class="setting-desc">点击以下图标，一键配置对应的大模型 API（API Key 和端点自动填入）</p>
+              </div>
+              <div class="setting-control">
+                <div class="provider-section">
+                  <div class="provider-presets" id="providerPresets">
+                    <button class="provider-btn" data-provider="openai" onclick="applyProviderPreset('openai')" title="OpenAI">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      <span>OpenAI</span>
+                    </button>
+                    <button class="provider-btn" data-provider="doubao" onclick="applyProviderPreset('doubao')" title="豆包（字节跳动）">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M8 12h8M12 8v8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                      <span>豆包</span>
+                    </button>
+                    <button class="provider-btn" data-provider="kimi" onclick="applyProviderPreset('kimi')" title="Kimi（Moonshot）">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 19h20L12 2z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+                      <span>Kimi</span>
+                    </button>
+                    <button class="provider-btn" data-provider="zhipu" onclick="applyProviderPreset('zhipu')" title="智谱 AI">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><polygon points="12,2 22,8.5 22,15.5 12,22 2,15.5 2,8.5" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+                      <span>智谱</span>
+                    </button>
+                    <button class="provider-btn" data-provider="siliconflow" onclick="applyProviderPreset('siliconflow')" title="硅基流动">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" stroke-width="2"/><path d="M9 9h6M9 12h6M9 15h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                      <span>硅基流动</span>
+                    </button>
+                    <button class="provider-btn" data-provider="deepseek" onclick="applyProviderPreset('deepseek')" title="DeepSeek">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                      <span>DeepSeek</span>
+                    </button>
+                  </div>
+                  <p class="provider-hint" id="providerHint">当前：OpenAI</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- API Key -->
+            <div class="setting-row">
+              <div class="setting-info">
+                <label class="setting-label">API Key</label>
+                <p class="setting-desc">在对应平台获取 API Key 后填入，Key 仅本地存储，不会上传。</p>
+                <p class="setting-note" id="apiKeyStatus"></p>
+              </div>
+              <div class="setting-control">
+                <div class="api-key-input-wrap">
+                  <input type="password" id="apiKeyInput" class="input" placeholder="输入 API Key..." autocomplete="off" />
+                  <button class="btn btn-ghost btn-sm" onclick="toggleApiKeyVisibility()">
+                    <i data-lucide="eye" id="eyeIcon" class="btn-icon"></i>
+                  </button>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="saveApiKey()">
+                  <i data-lucide="save" class="btn-icon"></i>保存 Key
+                </button>
+              </div>
+            </div>
+
+            <!-- API Base URL -->
+            <div class="setting-row">
+              <div class="setting-info">
+                <label class="setting-label">API 端点</label>
+                <p class="setting-desc">模型服务的 API 地址，点击上方服务商可自动填入。</p>
+              </div>
+              <div class="setting-control">
+                <input type="text" id="apiBaseUrlInput" class="input" placeholder="https://api.openai.com/v1" />
+                <button class="btn btn-primary btn-sm" onclick="saveApiBaseUrl()">
+                  <i data-lucide="save" class="btn-icon"></i>保存端点
+                </button>
+              </div>
+            </div>
+
+            <!-- Model -->
+            <div class="setting-row">
+              <div class="setting-info">
+                <label class="setting-label">模型</label>
+                <p class="setting-desc">选择使用的模型，点击上方服务商可自动选中推荐模型。</p>
+              </div>
+              <div class="setting-control">
+                <select id="modelSelect" class="select">
+                  <optgroup label="OpenAI">
+                    <option value="gpt-4o-mini">GPT-4o mini（推荐）</option>
+                    <option value="gpt-4o">GPT-4o</option>
+                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                  </optgroup>
+                  <optgroup label="豆包（字节跳动）">
+                    <option value="doubao-pro-32k">doubao-pro-32k（推荐）</option>
+                    <option value="doubao-lite-32k">doubao-lite-32k（轻量）</option>
+                    <option value="doubao-pro-4k">doubao-pro-4k</option>
+                    <option value="doubao-lite-4k">doubao-lite-4k</option>
+                  </optgroup>
+                  <optgroup label="Kimi（Moonshot）">
+                    <option value="moonshot-v1-8k">moonshot-v1-8k（推荐）</option>
+                    <option value="moonshot-v1-32k">moonshot-v1-32k</option>
+                    <option value="moonshot-v1-128k">moonshot-v1-128k</option>
+                  </optgroup>
+                  <optgroup label="智谱 GLM">
+                    <option value="glm-4-flash">GLM-4-Flash（推荐）</option>
+                    <option value="glm-4">GLM-4</option>
+                    <option value="glm-4-plus">GLM-4-Plus</option>
+                    <option value="glm-3-turbo">GLM-3-Turbo</option>
+                  </optgroup>
+                  <optgroup label="硅基流动（SiliconFlow）">
+                    <option value="Qwen/Qwen2.5-7B-Instruct">Qwen2.5-7B（推荐）</option>
+                    <option value="deepseek-ai/DeepSeek-V2.5">DeepSeek V2.5</option>
+                    <option value="THUDM/glm-4-9b-chat">GLM-4-9B</option>
+                    <option value="mistralai/Mistral-7B-Instruct-v0.2">Mistral-7B</option>
+                  </optgroup>
+                  <optgroup label="DeepSeek">
+                    <option value="deepseek-chat">DeepSeek Chat（推荐）</option>
+                    <option value="deepseek-coder">DeepSeek Coder</option>
+                  </optgroup>
+                  <optgroup label="Claude">
+                    <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku（推荐）</option>
+                    <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                    <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+                  </optgroup>
+                </select>
+                <button class="btn btn-primary btn-sm" onclick="saveModel()">
+                  <i data-lucide="save" class="btn-icon"></i>保存模型
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3><i data-lucide="sliders" class="card-icon"></i>写作偏好</h3>
+          </div>
+          <div class="card-body">
+            <div class="setting-row">
+              <div class="setting-info">
+                <label class="setting-label">默认平台</label>
+                <p class="setting-desc">新建文章时的默认目标平台。</p>
+              </div>
+              <div class="setting-control">
+                <select id="defaultPlatformSelect" class="select">
+                  <option value="news">新闻平台</option>
+                  <option value="commercial">商业分析</option>
+                  <option value="social">自媒体</option>
+                </select>
+                <button class="btn btn-primary btn-sm" onclick="saveDefaultPlatform()">
+                  <i data-lucide="save" class="btn-icon"></i>保存
+                </button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <label class="setting-label">默认字数</label>
+                <p class="setting-desc">新建文章时的默认目标字数。</p>
+              </div>
+              <div class="setting-control">
+                <select id="defaultWordCountSelect" class="select">
+                  <option value="500">500 字</option>
+                  <option value="800">800 字</option>
+                  <option value="1200">1200 字</option>
+                  <option value="2000">2000 字</option>
+                </select>
+                <button class="btn btn-primary btn-sm" onclick="saveDefaultWordCount()">
+                  <i data-lucide="save" class="btn-icon"></i>保存
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3><i data-lucide="database" class="card-icon"></i>数据管理</h3>
+          </div>
+          <div class="card-body">
+            <div class="setting-row">
+              <div class="setting-info">
+                <label class="setting-label">导出数据</label>
+                <p class="setting-desc">导出所有关键词和文章为 JSON 文件。</p>
+              </div>
+              <div class="setting-control">
+                <button class="btn btn-outline btn-sm" onclick="exportAllData()">
+                  <i data-lucide="download" class="btn-icon"></i>导出 JSON
+                </button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <label class="setting-label">清空所有数据</label>
+                <p class="setting-desc">删除所有关键词、文章和平台配置。不可恢复。</p>
+              </div>
+              <div class="setting-control">
+                <button class="btn btn-danger btn-sm" onclick="confirmClearData()">
+                  <i data-lucide="trash-2" class="btn-icon"></i>清空数据
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ── Modals ──────────────────────────────────────────────────────────── -->
+  <!-- Publish Modal -->
+  <div class="modal-overlay hidden" id="publishModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3><i data-lucide="send" class="modal-icon"></i>发布文章</h3>
+        <button class="btn btn-ghost btn-sm modal-close" onclick="closePublishModal()">
+          <i data-lucide="x" class="btn-icon"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-article-info" id="modalArticleInfo"></div>
+        <div class="form-group">
+          <label class="form-label">选择发布平台</label>
+          <div class="platform-select-grid" id="platformSelectGrid"></div>
+        </div>
+        <div class="publish-status hidden" id="publishStatus">
+          <div class="spinner"></div>
+          <span id="publishStatusText">正在发布...</span>
+        </div>
+        <div class="publish-result hidden" id="publishResult"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closePublishModal()">取消</button>
+        <button class="btn btn-primary" id="doPublishBtn" onclick="doPublish()">
+          <i data-lucide="rocket" class="btn-icon"></i>确认发布
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Article Modal -->
+  <div class="modal-overlay hidden" id="editModal">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h3><i data-lucide="edit-3" class="modal-icon"></i>编辑文章</h3>
+        <button class="btn btn-ghost btn-sm modal-close" onclick="closeEditModal()">
+          <i data-lucide="x" class="btn-icon"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">标题</label>
+          <input type="text" id="editTitle" class="input" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">平台</label>
+          <select id="editPlatform" class="select">
+            <option value="news">新闻平台</option>
+            <option value="commercial">商业分析</option>
+            <option value="social">自媒体</option>
+            <option value="manual">手动编辑</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">内容 <button class="btn btn-ghost btn-xs" onclick="insertImageEdit()" title="插入图片"><i data-lucide="image-plus" class="btn-icon"></i>插入图片</button></label>
+          <textarea id="editContent" class="textarea" rows="15"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeEditModal()">取消</button>
+        <button class="btn btn-primary" onclick="saveEditArticle()">
+          <i data-lucide="save" class="btn-icon"></i>保存修改
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Modal -->
+  <div class="modal-overlay hidden" id="confirmModal">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3 id="confirmTitle">确认操作</h3>
+      </div>
+      <div class="modal-body">
+        <p id="confirmMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeConfirmModal()">取消</button>
+        <button class="btn btn-danger" id="confirmBtn" onclick="doConfirmAction()">
+          <i data-lucide="alert-triangle" class="btn-icon"></i>确认
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
